@@ -1,10 +1,13 @@
 # AI API Scanner
 
+[![PyPI version](https://img.shields.io/pypi/v/ai-api-scanner)](https://pypi.org/project/ai-api-scanner/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/ai-api-scanner)](https://pypi.org/project/ai-api-scanner/)
+
 **Scan any OpenAI-compatible API endpoint for security misconfigurations. 12 checks, ~50 seconds.**
 
 ```bash
-pip install requests
-python scan.py https://your-api.com/v1 --key sk-your-key
+pip install ai-api-scanner
+ai-api-scanner https://your-api.com/v1 --key sk-your-key
 ```
 
 ## What it checks
@@ -131,7 +134,7 @@ CLI arguments always override config values.
 # .github/workflows/api-scan.yml
 - name: Scan API
   id: scanner
-  uses: AAAjczz/ai-api-scanner@v0.4
+  uses: AAAjczz/ai-api-scanner@v0.5
   with:
     target: ${{ secrets.API_URL }}
     api_key: ${{ secrets.API_KEY }}
