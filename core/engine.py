@@ -57,25 +57,33 @@ class Scanner:
         json_body: Optional[dict] = None,
         no_auth: bool = False,
     ) -> requests.Response:
-        """Send an HTTP request to the target with the shared session."""
+        """Send an HTTP request to the target."""
         url = f"{self.target}{path}"
-        req_headers = {}
-        if not no_auth:
-            req_headers = {}
+        # Build headers — always include User-Agent
+        req_headers = {"User-Agent": "ai-api-scanner/0.1.0"}
         if headers:
             req_headers.update(headers)
 
-        # Build a fresh headers dict — don't mutate session defaults
-        merged = dict(self.session.headers)
-        merged.update(req_headers)
-
-        return self.session.request(
-            method=method,
-            url=url,
-            headers=merged,
-            json=json_body,
-            timeout=self.timeout,
-        )
+        if no_auth:
+            # Bypass session entirely — sessions merge Authorization back in
+            return requests.request(
+                method=method,
+                url=url,
+                headers=req_headers,
+                json=json_body,
+                timeout=self.timeout,
+            )
+        else:
+            # Session headers (including Authorization) merged with per-request
+            merged = dict(self.session.headers)
+            merged.update(req_headers)
+            return self.session.request(
+                method=method,
+                url=url,
+                headers=merged,
+                json=json_body,
+                timeout=self.timeout,
+            )
 
     def request_raw(
         self,
