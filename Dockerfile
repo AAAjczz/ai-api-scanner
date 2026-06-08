@@ -6,7 +6,7 @@ LABEL org.opencontainers.image.source="https://github.com/AAAjczz/ai-api-scanner
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Install only requests — zero other deps
-RUN pip install --no-cache-dir requests==2.31.0
+RUN pip install --no-cache-dir "requests>=2.28"
 
 # Copy scanner source (src layout)
 COPY src/ai_api_scanner/ /app/ai_api_scanner/

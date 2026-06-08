@@ -1,0 +1,195 @@
+name: Dogfood — Scan Mock API
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Create mock API server
+        run: |
+          cat > mock_server.py << 'PYEOF'
+          """Minimal OpenAI-compatible mock with intentional vulnerabilities."""
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+
+          class MockAPI(BaseHTTPRequestHandler):
+              def _json(self, data, code=200):
+                  body = json.dumps(data).encode()
+                  self.send_response(code)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def do_GET(self):
+                  if self.path == "/v1/models" or self.path == "/models":
+                      # Wildcard CORS + no auth required = vulnerable
+                      self.send_response(200)
+                      self.send_header("Access-Control-Allow-Origin", "*")
+                      self.send_header("Content-Type", "application/json")
+                      body = b'{"data":[{"id":"gpt-4"}]}'
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  else:
+                      self._json({"error": "not found"}, 404)
+
+              def do_POST(self):
+                  length = int(self.headers.get("Content-Length", 0))
+                  body_raw = self.rfile.read(length) if length else b""
+                  try:
+                      body = json.loads(body_raw)
+                  except json.JSONDecodeError:
+                      # Info leak: return the raw body in the error
+                      self._json({"error": f"Invalid JSON: {body_raw.decode(errors='replace')[:100]}"}, 400)
+                      return
+
+                  model = body.get("model", "")
+                  # SSRF-like: model names that look like URLs return different errors
+                  if any(ip in model for ip in ["127.0.0.1", "169.254", "metadata"]):
+                      self._json({"error": "Connection refused to internal service"}, 502)
+                      return
+                  self._json({"choices":[{"message":{"content":"Hello"}}]})
+
+              def do_PUT(self):
+                  # Unsafe method not rejected
+                  self._json({"choices":[]}, 200)
+
+              def do_DELETE(self):
+                  self._json({"choices":[]}, 200)
+
+              def do_PATCH(self):
+                  self._json({"choices":[]}, 405)
+
+              def do_OPTIONS(self):
+                  self.send_response(200)
+                  self.send_header("Access-Control-Allow-Origin", "*")
+                  self.send_header("Access-Control-Allow-Credentials", "true")
+                  self.send_header("Content-Length", "0")
+                  self.end_headers()
+
+          if __name__ == "__main__":
+              srv = HTTPServer(("127.0.0.1", 8765), MockAPI)
+              print("Mock API on :8765")
+              srv.serve_forever()
+          PYEOF
+          python mock_server.py &
+          sleep 1
+          curl -s http://127.0.0.1:8765/models | head -c 200
+
+      - name: Run scanner against mock API
+        id: scan
+        run: |
+          ai-api-scanner http://127.0.0.1:8765/v1 --json --timeout 5 > scan_results.json 2>&1 || true
+          echo "--- scan output ---"
+          cat scan_results.json
+          python -c "
+          import json
+          with open('scan_results.json') as f:
+              data = json.load(f)
+          grade = data['grade']['grade']
+          score = data['grade']['score']
+          print(f'Grade: {grade} ({score}/100)')
+          # Mock has: no auth → FAIL, wildcard CORS → WARN, unsafe methods → WARN
+          # Expected: D or F (multiple issues)
+          assert score < 80, f'Expected failing grade for vulnerable mock, got {grade}'
+          print('Dogfood OK: scanner correctly identified vulnerable API')
+          "
+
+      - name: Verify markdown report
+        run: |
+          ai-api-scanner http://127.0.0.1:8765/v1 --md scan_report.md --timeout 5 || true
+          test -f scan_report.md && echo "Markdown report generated" || echo "Missing markdown report"
+
+      - name: Verify SARIF report
+        run: |
+          ai-api-scanner http://127.0.0.1:8765/v1 --sarif scan_results.sarif --timeout 5 || true
+          test -f scan_results.sarif && echo "SARIF report generated" || echo "Missing SARIF report"
+          python -c "
+          import json
+          with open('scan_results.sarif') as f:
+              sarif = json.load(f)
+          assert sarif['version'] == '2.1.0'
+          print('SARIF valid')
+          "
+
+      - name: Stop mock server
+        if: always()
+        run: kill %1 2>/dev/null || true
+
+  # Test the Docker-based GitHub Action itself (action.yml + Dockerfile + entrypoint.sh)
+  action-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start mock API for action test
+        run: |
+          cat > mock_server.py << 'PYEOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json, sys
+          class MockAPI(BaseHTTPRequestHandler):
+              def _json(self, data, code=200):
+                  body = json.dumps(data).encode()
+                  self.send_response(code)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header("Access-Control-Allow-Origin", "*")
+                  self.end_headers()
+                  self.wfile.write(b'{"data":[{"id":"gpt-4"}]}')
+              def do_POST(self):
+                  self._json({"choices":[{"message":{"content":"hi"}}]})
+              def do_PUT(self):
+                  self._json({"choices":[]}, 200)
+              def do_DELETE(self):
+                  self._json({"choices":[]}, 200)
+              def do_PATCH(self):
+                  self._json({"choices":[]}, 405)
+          srv = HTTPServer(("127.0.0.1", 8766), MockAPI)
+          print("Mock on :8766")
+          srv.serve_forever()
+          PYEOF
+          python mock_server.py &
+          sleep 1
+
+      - name: Run Docker action (uses: ./)
+        id: action
+        uses: ./
+        with:
+          target: http://127.0.0.1:8766/v1
+          timeout: '5'
+          fail_on: 'D'  # low bar — this mock is intentionally vulnerable
+
+      - name: Verify action outputs
+        run: |
+          echo "Grade: ${{ steps.action.outputs.grade }}"
+          echo "Score: ${{ steps.action.outputs.score }}"
+          echo "Passes: ${{ steps.action.outputs.passes }}"
+          echo "Fails: ${{ steps.action.outputs.fails }}"
+          echo "Warns: ${{ steps.action.outputs.warns }}"
+          # Mock has: no auth FAIL, wildcard CORS WARN, unsafe methods WARN
+          # Should score below 80
+          test "${{ steps.action.outputs.score }}" -lt 80 && echo "Action correctly detected vulnerabilities" || echo "Score: ${{ steps.action.outputs.score }}"
+          test -f "${{ steps.action.outputs.sarif_file }}" && echo "SARIF file exists" || echo "Missing SARIF"
+
+      - name: Stop mock server
+        if: always()
+        run: kill %1 2>/dev/null || true

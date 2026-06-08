@@ -31,7 +31,7 @@ class Scanner:
         self.config = config or {}
 
         self.session = requests.Session()
-        self.session.headers["User-Agent"] = "ai-api-scanner/0.1.0"
+        self.session.headers["User-Agent"] = "ai-api-scanner/0.5.0"
         if api_key:
             self.session.headers["Authorization"] = f"Bearer {api_key}"
 
@@ -108,7 +108,7 @@ class Scanner:
         """Send an HTTP request to the target."""
         url = f"{self.target}{path}"
         # Build headers — always include User-Agent
-        req_headers = {"User-Agent": "ai-api-scanner/0.1.0"}
+        req_headers = {"User-Agent": "ai-api-scanner/0.5.0"}
         if headers:
             req_headers.update(headers)
 
