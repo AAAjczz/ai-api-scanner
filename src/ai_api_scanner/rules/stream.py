@@ -2,6 +2,8 @@
 
 import time
 
+import requests as _requests
+
 from ..core.engine import Scanner
 from ..core.result import RuleResult, Status, Finding
 from .registry import register
@@ -27,7 +29,10 @@ def check_streaming_abuse(scanner: Scanner) -> RuleResult:
     # Establish baseline: a normal request
     try:
         normal = scanner.chat_completion(message="ping")
-        normal_ok = normal.status_code == 200
+        if normal.status_code != 200:
+            result.status = Status.SKIP
+            result.summary = f"Skipped — API returned {normal.status_code} for a normal request."
+            return result
     except Exception:
         result.status = Status.ERROR
         result.summary = "Cannot establish baseline — API is unreachable."
@@ -38,7 +43,6 @@ def check_streaming_abuse(scanner: Scanner) -> RuleResult:
         url = f"{scanner.target}/chat/completions"
         headers = dict(scanner.session.headers)
         headers["Content-Type"] = "application/json"
-        import requests as _requests
         stream_resp = _requests.post(
             url,
             headers=headers,

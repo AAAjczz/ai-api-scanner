@@ -5,7 +5,7 @@ import time
 import requests
 from typing import Optional, Callable
 
-from .result import RuleResult, Status, Finding, STATUS_SYMBOL
+from .result import RuleResult, Status, STATUS_SYMBOL
 
 # A Rule is a callable that takes a Scanner and returns a RuleResult
 Rule = Callable[..., RuleResult]

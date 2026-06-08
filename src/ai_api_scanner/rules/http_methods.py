@@ -85,14 +85,7 @@ def check_content_type(scanner: Scanner) -> RuleResult:
             pass
 
         try:
-            resp = scanner.request(
-                method="POST",
-                path="/chat/completions",
-                headers=headers if headers else None,
-                json_body=None,  # don't let requests auto-set Content-Type
-            )
-
-            # Also test with raw body to avoid requests library auto-setting Content-Type
+            # Use raw body to avoid requests library auto-setting Content-Type
             resp_raw = scanner.request_raw(
                 method="POST",
                 path="/chat/completions",

@@ -1,11 +1,9 @@
 """Terminal output formatting."""
 
-import shutil
 from .result import RuleResult, Status, STATUS_SYMBOL, compute_grade
 
 WIDTH = 80
 SEP = "─" * WIDTH
-THICK = "━" * WIDTH
 
 PALETTE = {
     Status.PASS:  "\033[32m",  # green
@@ -215,7 +213,7 @@ def generate_markdown(results: list[RuleResult], target: str) -> str:
     return "\n".join(lines)
 
 
-def generate_sarif(results: list[RuleResult], target: str, tool_version: str = "0.1.0") -> dict:
+def generate_sarif(results: list[RuleResult], target: str, tool_version: str = "0.5.0") -> dict:
     """Generate a SARIF 2.1.0 report (GitHub Code Scanning compatible)."""
     # Map our statuses to SARIF levels
     STATUS_TO_LEVEL = {

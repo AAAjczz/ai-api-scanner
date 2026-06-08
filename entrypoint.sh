@@ -48,8 +48,8 @@ PASSES=$(python -c "import json; d=json.load(open('$JSON_FILE')); print(d['grade
 python -c "
 import json, sys
 sys.path.insert(0, '/app')
-from core.output import generate_sarif
-from core.result import RuleResult, Status, Finding
+from ai_api_scanner.core.output import generate_sarif
+from ai_api_scanner.core.result import RuleResult, Status, Finding
 
 with open('$JSON_FILE') as f:
     data = json.load(f)
