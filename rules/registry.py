@@ -18,12 +18,14 @@ def register(rule_id: str, rule_name: str):
 def load_rules(selected: list[str] | None = None) -> list[tuple[str, str, Rule]]:
     """Return rules to run. Import rule modules to trigger registration first."""
     # Import all rule modules so @register fires
-    import rules.auth       # noqa: F401
-    import rules.rate_limit # noqa: F401
-    import rules.tls        # noqa: F401
-    import rules.cors       # noqa: F401
-    import rules.info_leak  # noqa: F401
-    import rules.key_format # noqa: F401
+    import rules.auth         # noqa: F401
+    import rules.rate_limit   # noqa: F401
+    import rules.tls          # noqa: F401
+    import rules.cors         # noqa: F401
+    import rules.info_leak    # noqa: F401
+    import rules.key_format   # noqa: F401
+    import rules.enumeration  # noqa: F401
+    import rules.http_methods # noqa: F401
 
     if selected is None:
         return list(_ALL_RULES)

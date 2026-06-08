@@ -13,7 +13,9 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent))
 
 from core.engine import Scanner
-from core.output import print_banner, print_results, print_summary
+from core.output import print_banner, print_summary, generate_markdown, generate_sarif
+from core.result import compute_grade
+from core.config import load_config
 from rules.registry import load_rules
 
 
@@ -24,7 +26,14 @@ def main():
     )
     parser.add_argument(
         "target",
+        nargs="?",
+        default=None,
         help="Base URL of the API (e.g., https://api.example.com/v1)",
+    )
+    parser.add_argument(
+        "--config", "-c",
+        default=None,
+        help="Path to config file (JSON). Auto-discovers .ai-scanner.json if present.",
     )
     parser.add_argument(
         "--key", "-k",
@@ -43,31 +52,97 @@ def main():
         help="Output results as JSON (for CI/CD)",
     )
     parser.add_argument(
+        "--md",
+        nargs="?",
+        const="scan_report.md",
+        default=None,
+        help="Generate Markdown report (default: scan_report.md)",
+    )
+    parser.add_argument(
+        "--sarif",
+        nargs="?",
+        const="scan_results.sarif",
+        default=None,
+        help="Generate SARIF report for GitHub Code Scanning (default: scan_results.sarif)",
+    )
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress progress output (useful in CI)",
+    )
+    parser.add_argument(
         "--timeout",
         type=float,
-        default=10.0,
+        default=None,
         help="Request timeout in seconds (default: 10)",
     )
 
     args = parser.parse_args()
 
-    target = args.target.rstrip("/")
+    # Load config (CLI args take precedence)
+    config = load_config(args.config)
+
+    # Resolve target: CLI arg > config file > error
+    target = args.target or config.get("target")
+    if not target:
+        parser.error("target is required (via CLI argument or config file)")
+
+    target = target.rstrip("/")
     if not target.startswith(("http://", "https://")):
         target = f"https://{target}"
 
-    rules = load_rules(args.rules)
-    scanner = Scanner(target, api_key=args.key, timeout=args.timeout, rules=rules)
+    # Resolve other settings: CLI > config > defaults
+    api_key = args.key or config.get("key")
+    timeout = args.timeout if args.timeout is not None else config.get("timeout", 10.0)
 
-    if not args.json:
+    # Resolve rules: CLI --rules > config rules.only > all
+    selected_rules = args.rules or config.get("rules", {}).get("only") or None
+    rules = load_rules(selected_rules)
+
+    # Apply config rules.skip (filter out skipped rules when running all)
+    if selected_rules is None and not args.rules:
+        skip_ids = set(config.get("rules", {}).get("skip", []))
+        if skip_ids:
+            rules = [(rid, rname, rfn) for rid, rname, rfn in rules if rid not in skip_ids]
+
+    quiet = args.quiet or args.json or bool(args.md) or bool(args.sarif)
+
+    scanner = Scanner(
+        target, api_key=api_key, timeout=timeout, rules=rules,
+        quiet=quiet, config=config.get("thresholds", {}),
+    )
+
+    if not quiet:
         print_banner(target)
 
     results = scanner.run()
 
     if args.json:
         import json as _json
-        print(_json.dumps([r.to_dict() for r in results], indent=2, ensure_ascii=False))
+        grade_info = compute_grade(results)
+        output = {
+            "target": target,
+            "grade": grade_info,
+            "results": [r.to_dict() for r in results],
+        }
+        print(_json.dumps(output, indent=2, ensure_ascii=False))
+    elif args.sarif:
+        import json as _json
+        sarif = generate_sarif(results, target)
+        with open(args.sarif, "w", encoding="utf-8") as f:
+            _json.dump(sarif, f, indent=2, ensure_ascii=False)
+        print(f"\n✅ SARIF report saved to {args.sarif}")
+        grade_info = compute_grade(results)
+        print(f"   Grade: {grade_info['grade']} ({grade_info['score']}/100) — {grade_info['description']}")
+    elif args.md:
+        md = generate_markdown(results, target)
+        with open(args.md, "w", encoding="utf-8") as f:
+            f.write(md)
+        print(f"\n✅ Report saved to {args.md}")
+        grade_info = compute_grade(results)
+        print(f"   Grade: {grade_info['grade']} ({grade_info['score']}/100) — {grade_info['description']}")
     else:
-        print_results(results)
+        # Engine already printed progress + details inline; just show summary
         print_summary(results)
 
 

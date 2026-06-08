@@ -1,8 +1,9 @@
 # AI API Scanner
 
-**Scan any OpenAI-compatible API endpoint for security misconfigurations. 7 checks, 2 seconds.**
+**Scan any OpenAI-compatible API endpoint for security misconfigurations. 10 checks, ~45 seconds.**
 
 ```bash
+pip install requests
 python scan.py https://your-api.com/v1 --key sk-your-key
 ```
 
@@ -17,6 +18,22 @@ python scan.py https://your-api.com/v1 --key sk-your-key
 | 5 | **CORS** | Wildcard origin, reflected origins |
 | 6 | **Error leak** | Stack traces, internal paths, debug info in errors |
 | 7 | **Key exposure** | API keys echoed in responses or headers |
+| 8 | **Model enumeration** | Different error codes revealing which models exist |
+| 9 | **HTTP methods** | Unsafe methods (PUT/DELETE/TRACE) not rejected |
+| 10 | **Content-Type** | Non-JSON content types accepted by the API |
+
+## Grade system
+
+Each scan gets a letter grade:
+
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| **A+** | 100 | Every check passed — production-grade |
+| **A** | 95+ | Production-ready |
+| **B** | 80+ | Minor warnings to review |
+| **C** | 60+ | At least one issue to fix |
+| **D** | 40+ | Multiple issues — fix before production |
+| **F** | <40 | Critical — urgent remediation |
 
 ## Install
 
@@ -40,9 +57,43 @@ python scan.py https://api.example.com/v1 -k sk-your-key
 # Run specific rules only
 python scan.py https://api.example.com/v1 -r auth tls cors
 
-# JSON output (for CI/CD)
+# JSON output (for CI/CD) — includes grade
 python scan.py https://api.example.com/v1 -k sk-key --json
+
+# Markdown report
+python scan.py https://api.example.com/v1 --md report.md
+
+# SARIF output (GitHub Code Scanning)
+python scan.py https://api.example.com/v1 --sarif
+
+# Quiet mode (CI-friendly)
+python scan.py https://api.example.com/v1 -q
+
+# Use config file (auto-discovers .ai-scanner.json)
+python scan.py
 ```
+
+## Configuration
+
+Create `.ai-scanner.json` to customize thresholds and skip rules:
+
+```json
+{
+  "target": "https://api.example.com/v1",
+  "key": "sk-your-key",
+  "timeout": 15,
+  "rules": {
+    "skip": ["rate-limit", "model-enum"],
+    "only": []
+  },
+  "thresholds": {
+    "tls_cert_expiry_warn_days": 60,
+    "rate_limit_parallel_count": 50
+  }
+}
+```
+
+CLI arguments always override config values.
 
 ## Example output
 
@@ -50,35 +101,24 @@ python scan.py https://api.example.com/v1 -k sk-key --json
    AI API Security Scanner
    scanning https://your-api.com/v1
 
-  [1/7] ❌  API key required
+  [1/10] 🔍 API key required...
+  [1/10] ❌  API key required  (312ms)
           /models is accessible without an API key.
           → HTTP 200 on unauthenticated request
           💡 Require a valid Bearer token for all API endpoints.
 
-  [2/7] ✅  Default/placeholder key check
+  [2/10] 🔍 Default/placeholder key check...
+  [2/10] ✅  Default/placeholder key check  (4251ms)
           All placeholder keys were properly rejected.
 
-  [3/7] ❌  Rate limiting
-          All 20 rapid requests succeeded — no rate limiting detected.
-          💡 Enable rate limiting on your API gateway or reverse proxy.
+  ...
 
-  [4/7] ✅  TLS configuration
-          TLSv1.3, certificate valid, trusted CA.
-
-  [5/7] ⚠️  CORS configuration
-          Access-Control-Allow-Origin is wildcard (*).
-          💡 Restrict to your specific frontend domain(s).
-
-  [6/7] ❌  Error info leak
-          Error responses leak internal path: "/etc/"
-          💡 Return generic error messages. Never expose internals.
-
-  [7/7] ✅  Key format & exposure
-          No key exposure detected in responses.
-
-  ────────────────────────────────────────────
-  3 ❌  1 ⚠️  3 ✅
-  ❌ 3 issues found. Fix before production.
+────────────────────────────────────────────────────────────────────────────────
+  ▌ GRADE  C  (75/100)
+  ▌ Needs work — at least one issue to fix
+────────────────────────────────────────────────────────────────────────────────
+  1 ❌  1 ⚠️  7 ✅  1 ⏭️
+  ❌ 1 issue found. Fix before production.
 ```
 
 ## CI/CD
@@ -89,7 +129,13 @@ python scan.py https://api.example.com/v1 -k sk-key --json
   run: |
     pip install requests
     python scan.py ${{ secrets.API_URL }} -k ${{ secrets.API_KEY }} --json > scan.json
-    python -c "import json; d=json.load(open('scan.json')); assert not any(r['status']=='FAIL' for r in d)"
+    python -c "import json; d=json.load(open('scan.json')); assert d['grade']['grade'] in ('A+','A','B')"
+
+# Upload SARIF to GitHub Code Scanning
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: scan_results.sarif
 ```
 
 ## What this is NOT
@@ -114,6 +160,19 @@ Yes. Lightweight requests only (model list, single chat, malformed payloads). No
 
 **Do I need to provide an API key?**
 No — but without one, auth and rate limit checks will be skipped.
+
+**How do I add my own rules?**
+```python
+# my_rule.py
+from rules.registry import register
+from core.engine import Scanner
+from core.result import RuleResult, Status
+
+@register("my-rule", "My custom check")
+def my_check(scanner: Scanner) -> RuleResult:
+    ...
+```
+Then import it in `rules/registry.py`.
 
 ## License
 

@@ -22,7 +22,7 @@ def check_rate_limiting(scanner: Scanner) -> RuleResult:
         result.summary = "Skipped — no API key provided, cannot test rate limiting."
         return result
 
-    PARALLEL_COUNT = 30
+    PARALLEL_COUNT = scanner.config.get("rate_limit_parallel_count", 30)
 
     def _send():
         try:

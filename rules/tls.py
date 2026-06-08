@@ -67,6 +67,7 @@ def check_tls(scanner: Scanner) -> RuleResult:
                 # Check certificate expiry
                 if cert and "notAfter" in cert:
                     expiry_str = cert["notAfter"]
+                    warn_days = scanner.config.get("tls_cert_expiry_warn_days", 30)
                     # Parse "Jun  8 12:00:00 2025 GMT"
                     try:
                         expiry = datetime.strptime(expiry_str, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
@@ -77,7 +78,7 @@ def check_tls(scanner: Scanner) -> RuleResult:
                                 evidence=f"Expired: {expiry_str}",
                             ))
                             all_ok = False
-                        elif days_left < 30:
+                        elif days_left < warn_days:
                             result.status = Status.WARN
                             findings.append(Finding(
                                 detail=f"TLS certificate expires in {days_left} days.",
