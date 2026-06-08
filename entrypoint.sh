@@ -33,7 +33,7 @@ fi
 
 # === Run scanner once, capture JSON to file ===
 echo "::group::🔒 AI API Scanner — scanning $TARGET"
-python /app/scan.py "${ARGS[@]}" > "$JSON_FILE" 2>&1 || true
+python -m ai_api_scanner.cli "${ARGS[@]}" > "$JSON_FILE" 2>&1 || true
 cat "$JSON_FILE"
 echo "::endgroup::"
 

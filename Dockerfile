@@ -8,10 +8,8 @@ LABEL org.opencontainers.image.licenses="MIT"
 # Install only requests — zero other deps
 RUN pip install --no-cache-dir requests==2.31.0
 
-# Copy scanner source
-COPY core/ /app/core/
-COPY rules/ /app/rules/
-COPY scan.py /app/scan.py
+# Copy scanner source (src layout)
+COPY src/ai_api_scanner/ /app/ai_api_scanner/
 COPY entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
