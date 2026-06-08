@@ -26,6 +26,8 @@ def load_rules(selected: list[str] | None = None) -> list[tuple[str, str, Rule]]
     import rules.key_format   # noqa: F401
     import rules.enumeration  # noqa: F401
     import rules.http_methods # noqa: F401
+    import rules.stream       # noqa: F401
+    import rules.ssrf         # noqa: F401
 
     if selected is None:
         return list(_ALL_RULES)

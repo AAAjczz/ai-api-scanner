@@ -1,6 +1,6 @@
 # AI API Scanner
 
-**Scan any OpenAI-compatible API endpoint for security misconfigurations. 10 checks, ~45 seconds.**
+**Scan any OpenAI-compatible API endpoint for security misconfigurations. 12 checks, ~50 seconds.**
 
 ```bash
 pip install requests
@@ -21,6 +21,8 @@ python scan.py https://your-api.com/v1 --key sk-your-key
 | 8 | **Model enumeration** | Different error codes revealing which models exist |
 | 9 | **HTTP methods** | Unsafe methods (PUT/DELETE/TRACE) not rejected |
 | 10 | **Content-Type** | Non-JSON content types accepted by the API |
+| 11 | **Streaming abuse** | Fire-and-abandon stream, slow-read attack |
+| 12 | **SSRF** | Internal URL resolution via model name injection |
 
 ## Grade system
 
@@ -101,14 +103,14 @@ CLI arguments always override config values.
    AI API Security Scanner
    scanning https://your-api.com/v1
 
-  [1/10] 🔍 API key required...
-  [1/10] ❌  API key required  (312ms)
+  [1/12] 🔍 API key required...
+  [1/12] ❌  API key required  (312ms)
           /models is accessible without an API key.
           → HTTP 200 on unauthenticated request
           💡 Require a valid Bearer token for all API endpoints.
 
-  [2/10] 🔍 Default/placeholder key check...
-  [2/10] ✅  Default/placeholder key check  (4251ms)
+  [2/12] 🔍 Default/placeholder key check...
+  [2/12] ✅  Default/placeholder key check  (4251ms)
           All placeholder keys were properly rejected.
 
   ...
@@ -117,7 +119,7 @@ CLI arguments always override config values.
   ▌ GRADE  C  (75/100)
   ▌ Needs work — at least one issue to fix
 ────────────────────────────────────────────────────────────────────────────────
-  1 ❌  1 ⚠️  7 ✅  1 ⏭️
+  1 ❌  1 ⚠️  9 ✅  1 ⏭️
   ❌ 1 issue found. Fix before production.
 ```
 
