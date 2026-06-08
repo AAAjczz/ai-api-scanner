@@ -170,7 +170,7 @@ jobs:
           python mock_server.py &
           sleep 1
 
-      - name: Run Docker action (uses: ./)
+      - name: Run Docker action locally
         id: action
         uses: ./
         with:
