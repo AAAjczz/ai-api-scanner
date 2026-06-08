@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Scan API endpoint
         id: scanner
-        uses: AAAjczz/ai-api-scanner@v0.3
+        uses: AAAjczz/ai-api-scanner@v0.4
         with:
           target: ${{ secrets.API_URL }}
           api_key: ${{ secrets.API_KEY }}

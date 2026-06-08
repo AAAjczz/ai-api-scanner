@@ -125,19 +125,32 @@ CLI arguments always override config values.
 
 ## CI/CD
 
-```yaml
-# GitHub Actions
-- name: API Security Scan
-  run: |
-    pip install requests
-    python scan.py ${{ secrets.API_URL }} -k ${{ secrets.API_KEY }} --json > scan.json
-    python -c "import json; d=json.load(open('scan.json')); assert d['grade']['grade'] in ('A+','A','B')"
+### GitHub Action (recommended)
 
-# Upload SARIF to GitHub Code Scanning
+```yaml
+# .github/workflows/api-scan.yml
+- name: Scan API
+  id: scanner
+  uses: AAAjczz/ai-api-scanner@v0.4
+  with:
+    target: ${{ secrets.API_URL }}
+    api_key: ${{ secrets.API_KEY }}
+
 - name: Upload SARIF
+  if: always()
   uses: github/codeql-action/upload-sarif@v3
   with:
-    sarif_file: scan_results.sarif
+    sarif_file: ${{ steps.scanner.outputs.sarif_file }}
+```
+
+See [docs/ci-example.yml](docs/ci-example.yml) for a complete workflow.
+
+### CLI
+
+```bash
+pip install requests
+python scan.py $API_URL -k $API_KEY --json > scan.json
+python -c "import json; d=json.load(open('scan.json')); assert d['grade']['grade'] in ('A+','A','B')"
 ```
 
 ## What this is NOT
