@@ -156,6 +156,10 @@ python scan.py $API_URL -k $API_KEY --json > scan.json
 python -c "import json; d=json.load(open('scan.json')); assert d['grade']['grade'] in ('A+','A','B')"
 ```
 
+## Fixing findings
+
+Every rule has a corresponding fix in the **[Remediation Guide](docs/remediation.md)** — specific nginx, LiteLLM, and FastAPI configuration examples for each finding.
+
 ## What this is NOT
 
 - Not a vulnerability scanner — it finds misconfigurations, not 0-days
