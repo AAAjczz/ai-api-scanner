@@ -116,32 +116,37 @@ def main():
         print_banner(target)
 
     results = scanner.run()
+    grade_info = compute_grade(results)
 
+    # JSON output (to stdout)
     if args.json:
         import json as _json
-        grade_info = compute_grade(results)
         output = {
             "target": target,
             "grade": grade_info,
             "results": [r.to_dict() for r in results],
         }
         print(_json.dumps(output, indent=2, ensure_ascii=False))
-    elif args.sarif:
+
+    # SARIF output (to file)
+    if args.sarif:
         import json as _json
         sarif = generate_sarif(results, target)
         with open(args.sarif, "w", encoding="utf-8") as f:
             _json.dump(sarif, f, indent=2, ensure_ascii=False)
         print(f"\n✅ SARIF report saved to {args.sarif}")
-        grade_info = compute_grade(results)
         print(f"   Grade: {grade_info['grade']} ({grade_info['score']}/100) — {grade_info['description']}")
-    elif args.md:
+
+    # Markdown output (to file)
+    if args.md:
         md = generate_markdown(results, target)
         with open(args.md, "w", encoding="utf-8") as f:
             f.write(md)
         print(f"\n✅ Report saved to {args.md}")
-        grade_info = compute_grade(results)
         print(f"   Grade: {grade_info['grade']} ({grade_info['score']}/100) — {grade_info['description']}")
-    else:
+
+    # Interactive terminal output
+    if not args.json and not args.md and not args.sarif:
         # Engine already printed progress + details inline; just show summary
         print_summary(results)
 

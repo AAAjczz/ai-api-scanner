@@ -1,0 +1,52 @@
+name: 'AI API Security Scanner'
+description: 'Scan any OpenAI-compatible API endpoint for security misconfigurations'
+author: 'AAAjczz'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  target:
+    description: 'Base URL of the API (e.g., https://api.example.com/v1)'
+    required: true
+  api_key:
+    description: 'API key for authenticated tests (enables more checks)'
+    required: false
+    default: ''
+  rules:
+    description: 'Specific rules to run (space-separated, default: all)'
+    required: false
+    default: ''
+  timeout:
+    description: 'Request timeout in seconds'
+    required: false
+    default: '10'
+  fail_on:
+    description: 'Fail the action if grade is below this (A/B/C/D/F)'
+    required: false
+    default: 'B'
+
+outputs:
+  grade:
+    description: 'Letter grade (A+, A, B, C, D, F)'
+  score:
+    description: 'Numeric score (0-100)'
+  passes:
+    description: 'Number of passing checks'
+  fails:
+    description: 'Number of failing checks'
+  warns:
+    description: 'Number of warnings'
+  sarif_file:
+    description: 'Path to the generated SARIF file (for upload-sarif)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.target }}
+    - ${{ inputs.api_key }}
+    - ${{ inputs.rules }}
+    - ${{ inputs.timeout }}
+    - ${{ inputs.fail_on }}

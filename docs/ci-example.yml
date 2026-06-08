@@ -1,0 +1,37 @@
+# Example: Run AI API Scanner in CI
+#
+# Copy this to your repo at .github/workflows/api-scan.yml
+# Set API_URL and API_KEY in your repo's Settings → Secrets
+
+name: API Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: '0 9 * * 1'  # every Monday at 9am
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan API endpoint
+        id: scanner
+        uses: AAAjczz/ai-api-scanner@v0.3
+        with:
+          target: ${{ secrets.API_URL }}
+          api_key: ${{ secrets.API_KEY }}
+          fail_on: 'B'
+
+      - name: Upload results to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scanner.outputs.sarif_file }}
+
+      - name: Check grade
+        run: |
+          echo "Grade: ${{ steps.scanner.outputs.grade }}"
+          echo "Score: ${{ steps.scanner.outputs.score }}/100"
+          echo "Passes: ${{ steps.scanner.outputs.passes }}"
+          echo "Fails: ${{ steps.scanner.outputs.fails }}"
